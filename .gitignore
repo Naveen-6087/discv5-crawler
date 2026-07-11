@@ -1,0 +1,9 @@
+/discv5-crawler
+/discv5-crawler.exe
+*.test
+*.out
+nodes.json
+/**/testdata/fuzz/*/cache/
+.idea/
+.vscode/
+.DS_Store
