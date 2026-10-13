@@ -190,6 +190,23 @@ func TestByteListEncoding(t *testing.T) {
 	}
 }
 
+func TestClientEntry(t *testing.T) {
+	info, err := Parse(signed(t, enr.WithEntry("client", []string{"Lighthouse", "8.2.3", "x86_64-linux"})))
+	if err != nil || info.Client == nil || *info.Client != (Client{"Lighthouse", "8.2.3"}) {
+		t.Fatalf("client %+v %v", info.Client, err)
+	}
+	info, err = Parse(signed(t, enr.WithEntry("client", []string{"Grandine"})))
+	if err != nil || info.Client == nil || info.Client.Name != "Grandine" || info.Client.Version != "" {
+		t.Fatalf("name only: %+v %v", info.Client, err)
+	}
+	if info, err := Parse(signed(t, enr.WithEntry("client", uint64(7)))); err == nil || info.Client != nil {
+		t.Fatalf("malformed client accepted: %+v", info.Client)
+	}
+	if info, _ := Parse(signed(t)); info.Client != nil {
+		t.Fatal("absent client decoded")
+	}
+}
+
 func TestShortEth2IsReported(t *testing.T) {
 	info, err := Parse(signed(t, enr.WithEntry("eth2", []byte{1, 2, 3})))
 	if err == nil || info.Eth2 != nil {

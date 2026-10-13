@@ -51,7 +51,8 @@ func fixture(t *testing.T) []nodedb.Entry {
 	bpo2 := [4]byte{0x8c, 0x9f, 0x62, 0xfe}
 	mainnetEL := forkid.ID{Hash: [4]byte{0x07, 0xc9, 0x46, 0x2e}}
 	cl := []*enode.Node{
-		rec(t, net.IP{1, 1, 1, 1}, 9000, eth2(bpo2), enr.WithEntry("cgc", uint64(4)), enr.WithEntry("attnets", []byte{0x0f, 0, 0, 0, 0, 0, 0, 0})),
+		rec(t, net.IP{1, 1, 1, 1}, 9000, eth2(bpo2), enr.WithEntry("cgc", uint64(4)), enr.WithEntry("attnets", []byte{0x0f, 0, 0, 0, 0, 0, 0, 0}),
+			enr.WithEntry("client", []string{"Lighthouse", "8.2.3"})),
 		rec(t, net.IP{1, 1, 1, 1}, 9001, eth2(bpo2), enr.WithEntry("cgc", uint64(128)), enr.WithEntry("attnets", []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff})),
 		rec(t, net.IP{2, 2, 2, 2}, 9000, eth2([4]byte{0xde, 0xad, 0xbe, 0xef})),
 	}
@@ -108,6 +109,12 @@ func TestCompute(t *testing.T) {
 	if r.MeanAttnets != 34 { // (4 + 64) / 2
 		t.Errorf("mean attnets %v", r.MeanAttnets)
 	}
+	if c, _ := find(r.Clients, "Lighthouse"); c.N != 1 || len(r.Clients) != 1 {
+		t.Errorf("clients %+v", r.Clients)
+	}
+	if c, _ := find(r.Versions, "Lighthouse 8.2.3"); c.N != 1 {
+		t.Errorf("versions %+v", r.Versions)
+	}
 	if c, _ := find(r.Failures, "timeout"); c.N != 1 {
 		t.Errorf("failures %+v", r.Failures)
 	}
@@ -130,7 +137,7 @@ func TestPrint(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := buf.String()
-	for _, want := range []string{"nodes", "responsive", "fork digests", "8c9f62fe", "fulu-bpo2", "mainnet (current)", "peerdas custody group count", "last error of failed nodes"} {
+	for _, want := range []string{"nodes", "responsive", "fork digests", "8c9f62fe", "fulu-bpo2", "mainnet (current)", "peerdas custody group count", "last error of failed nodes", "self-reported clients"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output lacks %q:\n%s", want, out)
 		}

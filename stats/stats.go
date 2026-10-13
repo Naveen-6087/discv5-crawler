@@ -45,6 +45,8 @@ type Report struct {
 	MeanAttnets float64 `json:"mean_attnets"`
 	Keys        []Count `json:"enr_keys"`
 	Quirks      []Count `json:"quirks"`
+	Clients     []Count `json:"clients"`
+	Versions    []Count `json:"client_versions"`
 	UDPPorts    []Count `json:"udp_ports"`
 	Failures    []Count `json:"last_errors"`
 }
@@ -60,6 +62,8 @@ func Compute(entries []nodedb.Entry, now time.Time, onlyResponsive bool) Report 
 	custody := map[string]int{}
 	keys := map[string]int{}
 	quirks := map[string]int{}
+	clients := map[string]int{}
+	versions := map[string]int{}
 	ports := map[string]int{}
 	fails := map[string]int{}
 	ips := map[string]int{}
@@ -100,6 +104,14 @@ func Compute(entries []nodedb.Entry, now time.Time, onlyResponsive bool) Report 
 		}
 		for _, q := range info.Quirks {
 			quirks[q]++
+		}
+		if info.Client != nil {
+			clients[info.Client.Name]++
+			v := info.Client.Name
+			if info.Client.Version != "" {
+				v += " " + info.Client.Version
+			}
+			versions[v]++
 		}
 		if info.UDP != 0 {
 			ports[strconv.Itoa(int(info.UDP))]++
@@ -142,6 +154,8 @@ func Compute(entries []nodedb.Entry, now time.Time, onlyResponsive bool) Report 
 	r.Custody = sorted(custody, nil)
 	r.Keys = sorted(keys, nil)
 	r.Quirks = sorted(quirks, nil)
+	r.Clients = sorted(clients, nil)
+	r.Versions = sorted(versions, nil)
 	r.UDPPorts = sorted(ports, nil)
 	r.Failures = sorted(fails, nil)
 	return r
@@ -237,6 +251,8 @@ func (r Report) Print(w io.Writer, top int) error {
 	section("announced next forks (version@epoch)", r.NextForks, r.Consensus)
 	section("execution fork ids (hash/next)", r.ELForks, r.Execution)
 	section("peerdas custody group count", r.Custody, r.Consensus)
+	section("self-reported clients (\"client\" entry)", r.Clients, r.Counted)
+	section("client versions", r.Versions, r.Counted)
 	section("non-standard record encodings", r.Quirks, r.Counted)
 	section("enr keys", r.Keys, r.Counted)
 	section("udp ports", r.UDPPorts, r.Counted)
