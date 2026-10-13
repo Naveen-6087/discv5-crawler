@@ -116,9 +116,10 @@ func TestErrors(t *testing.T) {
 	}
 }
 
-func TestDefaultBootnodesParse(t *testing.T) {
-	nodes, err := loadBootnodes("")
-	if err != nil || len(nodes) == 0 {
-		t.Fatalf("mainnet bootnodes: %d %v", len(nodes), err)
+func TestSeedErrors(t *testing.T) {
+	var out, logs bytes.Buffer
+	err := run(context.Background(), []string{"crawl", "-db", "", "-dns", "goerli"}, &out, &logs)
+	if err == nil || !strings.Contains(err.Error(), "goerli") {
+		t.Fatalf("unknown DNS list: %v", err)
 	}
 }

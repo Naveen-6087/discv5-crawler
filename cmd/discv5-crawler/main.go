@@ -20,10 +20,10 @@ import (
 	gethlog "github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/go-ethereum/params"
 
 	"github.com/Naveen-6087/discv5-crawler/crawler"
 	"github.com/Naveen-6087/discv5-crawler/nodedb"
+	"github.com/Naveen-6087/discv5-crawler/seed"
 	"github.com/Naveen-6087/discv5-crawler/stats"
 )
 
@@ -71,6 +71,8 @@ func cmdCrawl(ctx context.Context, args []string, out, logOut io.Writer) error {
 	dbPath := fs.String("db", "nodes.json", "node database (created if missing)")
 	duration := fs.Duration("duration", 10*time.Minute, "stop after this long (0 = until the crawl completes)")
 	bootFile := fs.String("bootnodes", "", "file with one ENR per line (default: mainnet discv5 bootnodes)")
+	dnsLists := fs.String("dns", "", "also seed from EIP-1459 DNS lists: mainnet, sepolia, hoodi or enrtree:// URLs (comma-separated)")
+	dnsMax := fs.Int("dns-max", 200, "maximum nodes taken from DNS lists")
 	listen := fs.String("addr", "0.0.0.0:0", "UDP listen address")
 	keyFile := fs.String("nodekey", "", "hex secp256k1 key file (default: a new key per run)")
 	workers := fs.Int("workers", 256, "nodes crawled concurrently")
@@ -91,7 +93,7 @@ func cmdCrawl(ctx context.Context, args []string, out, logOut io.Writer) error {
 	}
 	log := slog.New(slog.NewTextHandler(logOut, &slog.HandlerOptions{Level: level}))
 
-	boot, err := loadBootnodes(*bootFile)
+	boot, err := loadSeeds(ctx, *bootFile, *dnsLists, *dnsMax, log)
 	if err != nil {
 		return err
 	}
@@ -206,36 +208,36 @@ func logProgress(log *slog.Logger, s *crawler.Stats, db *nodedb.DB, elapsed time
 	)
 }
 
-func loadBootnodes(path string) ([]*enode.Node, error) {
-	lines := params.V5Bootnodes
-	if path != "" {
-		f, err := os.Open(path)
-		if err != nil {
-			return nil, err
-		}
-		defer f.Close()
-		lines = nil
-		sc := bufio.NewScanner(f)
-		for sc.Scan() {
-			l := strings.TrimSpace(sc.Text())
-			if l != "" && !strings.HasPrefix(l, "#") {
-				lines = append(lines, l)
-			}
-		}
-		if err := sc.Err(); err != nil {
-			return nil, err
-		}
-	}
+func loadSeeds(ctx context.Context, bootFile, dnsLists string, dnsMax int, log *slog.Logger) ([]*enode.Node, error) {
 	var nodes []*enode.Node
-	for _, l := range lines {
-		n, err := enode.Parse(enode.ValidSchemes, l)
-		if err != nil {
-			return nil, fmt.Errorf("bootnode %q: %w", l, err)
+	var err error
+	if bootFile != "" {
+		nodes, err = seed.File(bootFile)
+	} else {
+		nodes, err = seed.MainnetBootnodes()
+	}
+	if err != nil {
+		return nil, err
+	}
+	if dnsLists != "" {
+		var urls []string
+		for _, name := range strings.Split(dnsLists, ",") {
+			u, err := seed.DNSList(strings.TrimSpace(name))
+			if err != nil {
+				return nil, err
+			}
+			urls = append(urls, u)
 		}
-		nodes = append(nodes, n)
+		start := time.Now()
+		fromDNS, err := seed.FromDNS(ctx, urls, seed.DNSOptions{Max: dnsMax})
+		if err != nil {
+			return nil, fmt.Errorf("dns seeds: %w", err)
+		}
+		log.Info("dns seeds", "nodes", len(fromDNS), "lists", len(urls), "elapsed", time.Since(start).Round(time.Millisecond))
+		nodes = append(nodes, fromDNS...)
 	}
 	if len(nodes) == 0 {
-		return nil, errors.New("no bootnodes")
+		return nil, errors.New("no seed nodes")
 	}
 	return nodes, nil
 }
