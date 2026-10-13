@@ -18,8 +18,7 @@ The wire protocol is go-ethereum's `p2p/discover` implementation, so sessions, h
 ## Usage
 
 ```bash
-git clone https://github.com/Naveen-6087/vaulkyrie-android discv5-crawler
-cd discv5-crawler && go install ./cmd/discv5-crawler
+go install github.com/Naveen-6087/discv5-crawler/cmd/discv5-crawler@latest
 ```
 
 ```bash
