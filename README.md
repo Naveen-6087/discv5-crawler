@@ -25,7 +25,7 @@ go install github.com/Naveen-6087/discv5-crawler/cmd/discv5-crawler@latest
 discv5-crawler crawl -db nodes.json -duration 10m
 ```
 
-This starts from the mainnet discv5 bootnodes that ship with go-ethereum. Use `-bootnodes file` to supply your own (one ENR per line). The command logs progress every 15 seconds, writes the database every 30 seconds and on exit, and prints a report at the end. Ctrl-C stops the crawl cleanly.
+This starts from the mainnet discv5 bootnodes that ship with go-ethereum. Use `-bootnodes file` to supply your own (one ENR per line). Add `-dns mainnet` (or `sepolia`, `hoodi`, or any `enrtree://` URL) to also seed from the Ethereum Foundation's signed [EIP-1459](https://eips.ethereum.org/EIPS/eip-1459) DNS node lists. Up to `-dns-max` nodes (default 200) are verified against each list's signed root. The command logs progress every 15 seconds, writes the database every 30 seconds and on exit, and prints a report at the end. Ctrl-C stops the crawl cleanly.
 
 ```bash
 discv5-crawler stats -db nodes.json -responsive
