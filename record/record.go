@@ -40,6 +40,30 @@ type Info struct {
 	Eth []forkid.ID // execution-layer fork IDs from the "eth" entry
 
 	Quirks []string // non-standard but decodable encodings
+
+	Client *Client // from the optional "client" entry
+}
+
+// Client is the self-reported implementation in the "client" entry, an RLP
+// list [name, version, ...]. Lighthouse and Grandine publish it.
+type Client struct {
+	Name    string
+	Version string
+}
+
+func loadClient(n *enode.Node) (*Client, error) {
+	var fields []string
+	if err := n.Load(enr.WithEntry("client", &fields)); err != nil {
+		return nil, err
+	}
+	if len(fields) == 0 || fields[0] == "" {
+		return nil, fmt.Errorf("empty client entry")
+	}
+	c := &Client{Name: fields[0]}
+	if len(fields) > 1 {
+		c.Version = fields[1]
+	}
+	return c, nil
 }
 
 // QuirkWrappedEth marks an "eth" entry whose list is wrapped in an extra RLP
@@ -203,6 +227,14 @@ func Parse(n *enode.Node) (Info, error) {
 			errs = append(errs, fmt.Errorf("cgc: %w", err))
 		} else {
 			info.CGC = int(cgc)
+		}
+	}
+	if has("client") {
+		c, err := loadClient(n)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("client: %w", err))
+		} else {
+			info.Client = c
 		}
 	}
 	if has("eth") {
