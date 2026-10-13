@@ -12,6 +12,8 @@ The wire protocol is go-ethereum's `p2p/discover` implementation, so sessions, h
 | `nodedb/` | JSON node database: deduplication by node ID and sequence number, atomic writes |
 | `record/` | Decoding of `eth2`, `eth`, `attnets`, `syncnets`, `cgc`, `nfd` and the IP/port entries; mainnet fork labels |
 | `stats/` | Network statistics report (text or JSON) |
+| `seed/` | Bootnode files and EIP-1459 DNS node lists |
+| `tui/` | Live terminal dashboard for `crawl -tui` |
 | `cmd/discv5-crawler/` | CLI: `crawl`, `stats`, `export` |
 | `docs/` | Results of a mainnet crawl |
 
@@ -32,6 +34,12 @@ discv5-crawler stats -db nodes.json -responsive
 discv5-crawler stats -db nodes.json -json > report.json
 discv5-crawler export -db nodes.json -responsive > live-enrs.txt
 ```
+
+```bash
+discv5-crawler crawl -db nodes.json -dns mainnet -tui
+```
+
+`-tui` replaces the log output with a live dashboard. It shows the crawl counters and request rate, a sparkline of newly discovered nodes per second with the duplicate ratio, and the error breakdown. It also shows fork digest, client and PeerDAS custody distributions, recomputed from the database every three seconds. Pressing `q` stops the crawl; the database is still flushed and the final report printed.
 
 Running `crawl` again with the same database resumes from it. Every stored node that has not been tried for `-recheck` (30 minutes by default) is queued again. Nodes that have failed five times in a row are skipped.
 
