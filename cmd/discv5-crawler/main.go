@@ -16,6 +16,8 @@ import (
 	"strings"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	gethlog "github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/discover"
@@ -25,6 +27,7 @@ import (
 	"github.com/Naveen-6087/discv5-crawler/nodedb"
 	"github.com/Naveen-6087/discv5-crawler/seed"
 	"github.com/Naveen-6087/discv5-crawler/stats"
+	"github.com/Naveen-6087/discv5-crawler/tui"
 )
 
 const usage = `usage: discv5-crawler <command> [flags]
@@ -83,6 +86,7 @@ func cmdCrawl(ctx context.Context, args []string, out, logOut io.Writer) error {
 	flushEvery := fs.Duration("flush", 30*time.Second, "database write interval")
 	progress := fs.Duration("progress", 15*time.Second, "progress log interval (0 = off)")
 	verbose := fs.Bool("v", false, "debug logging")
+	dashboard := fs.Bool("tui", false, "live terminal dashboard instead of log lines (q stops the crawl)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -90,6 +94,9 @@ func cmdCrawl(ctx context.Context, args []string, out, logOut io.Writer) error {
 	level := slog.LevelInfo
 	if *verbose {
 		level = slog.LevelDebug
+	}
+	if *dashboard {
+		logOut = io.Discard
 	}
 	log := slog.New(slog.NewTextHandler(logOut, &slog.HandlerOptions{Level: level}))
 
@@ -134,6 +141,8 @@ func cmdCrawl(ctx context.Context, args []string, out, logOut io.Writer) error {
 	defer disc.Close()
 	log.Info("listening", "addr", conn.LocalAddr(), "id", ln.ID().TerminalString(), "known", db.Len())
 
+	ctx, stop := context.WithCancel(ctx)
+	defer stop()
 	if *duration > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, *duration)
@@ -151,6 +160,21 @@ func cmdCrawl(ctx context.Context, args []string, out, logOut io.Writer) error {
 	start := time.Now()
 	done := make(chan error, 1)
 	go func() { done <- c.Run(ctx, boot) }()
+
+	var dash *tea.Program
+	dashDone := make(chan struct{})
+	if *dashboard {
+		dash = tea.NewProgram(tui.New(c.Stats(), db, conn.LocalAddr().String(), stop), tea.WithAltScreen(), tea.WithOutput(out))
+		go func() {
+			defer close(dashDone)
+			if _, err := dash.Run(); err != nil {
+				log.Error("dashboard", "err", err)
+			}
+			stop()
+		}()
+	} else {
+		close(dashDone)
+	}
 
 	flushT := time.NewTicker(*flushEvery)
 	defer flushT.Stop()
@@ -174,6 +198,11 @@ loop:
 			logProgress(log, c.Stats(), db, time.Since(start))
 		}
 	}
+	if dash != nil {
+		dash.Send(tui.DoneMsg{Err: runErr})
+		dash.Quit()
+	}
+	<-dashDone
 	logProgress(log, c.Stats(), db, time.Since(start))
 	if err := db.Flush(); err != nil {
 		return fmt.Errorf("writing %s: %w", *dbPath, err)
